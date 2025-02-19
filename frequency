@@ -1,0 +1,8 @@
+import collections
+
+def frequency_analysis(text):
+    """Возвращает частоту букв в тексте."""
+    text = text.lower()
+    letter_counts = collections.Counter(c for c in text if c.isalpha())
+    total = sum(letter_counts.values())
+    return {char: count / total for char, count in letter_counts.items()}
