@@ -1,0 +1,17 @@
+from frequency import frequency_analysis
+from caesar import caesar_bruteforce
+from text_utils import clean_text
+
+def main():
+    text = input("Введите зашифрованный текст: ")
+    cleaned_text = clean_text(text)
+
+    print("\n Анализ частоты букв:")
+    print(frequency_analysis(cleaned_text))
+
+    print("\n Возможные расшифровки шифра Цезаря:")
+    for shift, decrypted in caesar_bruteforce(cleaned_text).items():
+        print(f"Сдвиг {shift}: {decrypted}")
+
+if __name__ == "__main__":
+    main()
