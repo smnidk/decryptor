@@ -34,20 +34,20 @@ def test_vigenere():
     key = ''.join(random.choices(string.ascii_uppercase, k=random.randint(3, 7)))  # Случайный ключ длиной 3-7 символов
 
     ciphertext = vigenere_encrypt(clean_text(plaintext), key)
-    print(f"🔑 Исходный ключ: {key}")
-    print(f"📝 Зашифрованный текст: {ciphertext}")
+    print(f" Исходный ключ: {key}")
+    print(f" Зашифрованный текст: {ciphertext}")
 
     # Взлом шифра
     key_length = kasiski_examination(ciphertext)
     if not key_length:
-        print("❌ Не удалось определить длину ключа.")
+        print(" Не удалось определить длину ключа.")
         return
 
     guessed_key = find_vigenere_key(ciphertext, key_length)
-    print(f"📝 Определённый ключ: {guessed_key}")
+    print(f" Определённый ключ: {guessed_key}")
 
     decrypted_text = vigenere_decrypt(ciphertext, guessed_key)
-    print("\n🔓 Расшифрованный текст:", decrypted_text)
+    print("\n Расшифрованный текст:", decrypted_text)
 
 if __name__ == "__main__":
     test_vigenere()
