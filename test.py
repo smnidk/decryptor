@@ -38,7 +38,7 @@ def encrypt(data, keys, depth):
     data = pad(data)
     blocks = [data[i:i+AES.block_size] for i in range(0, len(data), AES.block_size)]
     encrypted_blocks = []
-    prev_blocks = [b"\x00" * AES.block_size] * depth  
+    prev_blocks = [b"\x00" * AES.block_size] * depth  # Инициализация нулевыми блоками
     
     for block in blocks:
         mixed_block = xor_bytes(block, *prev_blocks)
@@ -64,13 +64,13 @@ def decrypt(data, keys, depth):
     
     return unpad(b"".join(decrypted_blocks))
 
-
+# === Преобразование строки в ключ ===
 def string_to_key(input_str, key_size=16):
     """ Преобразует строку в фиксированный ключ (16, 24 или 32 байта). """
-    hash_value = sha256(input_str.encode()).digest()  
-    return hash_value[:key_size]  
+    hash_value = sha256(input_str.encode()).digest()  # Хешируем строку
+    return hash_value[:key_size]  # Берем нужную длину ключа
 
-
+# === Ввод параметров ===
 def get_keys(num_keys):
     """ Функция получения ключей от пользователя. """
     keys = []
@@ -79,9 +79,9 @@ def get_keys(num_keys):
         for i in range(num_keys):
             key_input = input(f"Введите ключ {i+1} (строка или hex): ")
             if all(c in '0123456789abcdefABCDEF' for c in key_input) and len(key_input) in (32, 48, 64):
-                key = bytes.fromhex(key_input)  
+                key = bytes.fromhex(key_input)  # Если введен hex, используем его
             else:
-                key = string_to_key(key_input)  
+                key = string_to_key(key_input)  # Иначе, преобразуем строку в ключ
             keys.append(key)
     else:
         keys = [get_random_bytes(16) for _ in range(num_keys)]
@@ -90,22 +90,16 @@ def get_keys(num_keys):
             print(f"Ключ {i+1}: {key.hex()}")
     return keys
 
-
-mode = input("Выберите режим: (e) шифрование / (d) дешифрование: ").strip().lower()
+# === ТЕСТ ===
 num_keys = int(input("Введите количество ключей: "))
 depth = int(input("Введите количество предыдущих блоков для XOR: "))
 keys = get_keys(num_keys)
 
-if mode == 'e':
-    plaintext = input("Введите сообщение для шифрования: ").encode()
-    encrypted = encrypt(plaintext, keys, depth)
-    print("Encrypted:", encrypted.hex())
+plaintext = input("Введите сообщение для шифрования: ").encode()
 
-elif mode == 'd':
-    encrypted_hex = input("Введите зашифрованные данные (hex): ")
-    encrypted = bytes.fromhex(encrypted_hex)
-    decrypted = decrypt(encrypted, keys, depth)
-    print("Decrypted:", decrypted.decode(errors='ignore'))
+encrypted = encrypt(plaintext, keys, depth)
+decrypted = decrypt(encrypted, keys, depth)
 
-else:
-    print("Неверный режим работы!")
+print("Original:", plaintext)
+print("Encrypted:", encrypted.hex())
+print("Decrypted:", decrypted)
