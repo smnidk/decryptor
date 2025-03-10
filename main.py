@@ -1,46 +1,51 @@
-from frequency import frequency_analysis
-from caesar import caesar_bruteforce, caesar_decrypt
-from text_utils import clean_text
-from vigenere import vigenere_decrypt
-
+from aes import aes_encrypt, aes_decrypt
+from triple_aes import triple_aes_encrypt, triple_aes_decrypt, generate_keys
 
 def main():
-    text = input("Введите зашифрованный текст: ")
-    cleaned_text = clean_text(text)
+    while True:
+        print("\nВыберите действие:")
+        print("1. Зашифровать AES")
+        print("2. Расшифровать AES")
+        print("3. Зашифровать тройным AES")
+        print("4. Расшифровать тройным AES")
+        print("5. Выход")
 
-    print("\nВыберите тип шифра:")
-    print("1 - Шифр Цезаря")
-    print("2 - Шифр Виженера")
-    choice = input("Введите номер: ")
+        choice = input("Введите номер действия: ").strip()
 
-    if choice == "1":
-        print("\nВыберите способ расшифровки Цезаря:")
-        print("1 - Указать сдвиг")
-        print("2 - Брутфорс (перебор всех вариантов)")
-        caesar_choice = input("Введите номер: ")
+        if choice == "1":
+            text = input("Введите текст для шифрования: ").strip()
+            key = input("Введите ключ: ").strip()
+            print("Зашифрованный текст:", aes_encrypt(text, key))
 
-        if caesar_choice == "1":
-            shift = int(input("Введите сдвиг: "))
-            print("\nРасшифрованный текст (Цезарь):")
-            print(caesar_decrypt(cleaned_text, shift))
-        elif caesar_choice == "2":
-            print("\nВозможные расшифровки шифра Цезаря:")
-            for shift, decrypted in caesar_bruteforce(cleaned_text).items():
-                print(f"Сдвиг {shift}: {decrypted}")
+        elif choice == "2":
+            text = input("Введите зашифрованный текст: ").strip()
+            key = input("Введите ключ: ").strip()
+            print("Расшифрованный текст:", aes_decrypt(text, key))
+
+        elif choice == "3":
+            text = input("Введите текст для шифрования: ").strip()
+            key_choice = input("Введите '1' для ввода трех ключей или '2' для генерации случайных ключей: ").strip()
+            if key_choice == "1":
+                keys = [input(f"Введите ключ {i+1}: ").strip() for i in range(3)]
+            elif key_choice == "2":
+                keys = generate_keys()
+                print("Сгенерированные ключи:", keys)
+            else:
+                print("Ошибка: Неверный ввод, попробуйте снова.")
+                continue
+            print("Зашифрованный текст:", triple_aes_encrypt(text, keys))
+
+        elif choice == "4":
+            text = input("Введите зашифрованный текст: ").strip()
+            keys = [input(f"Введите ключ {i+1}: ").strip() for i in range(3)]
+            print("Расшифрованный текст:", triple_aes_decrypt(text, keys))
+
+        elif choice == "5":
+            print("Выход...")
+            break
+
         else:
-            print("Некорректный выбор.")
-
-    elif choice == "2":
-        key = input("Введите ключ для Виженера: ")
-        print("\nРасшифрованный текст (Виженер):")
-        print(vigenere_decrypt(cleaned_text, key))
-
-    else:
-        print("Некорректный выбор.")
-
-    print("\nАнализ частоты букв:")
-    print(frequency_analysis(cleaned_text))
-
+            print("Ошибка: Неверный ввод, попробуйте снова.")
 
 if __name__ == "__main__":
     main()
