@@ -1,98 +1,111 @@
-import os
-import struct
-from hashlib import sha256
 from Crypto.Cipher import AES
-from Crypto.Protocol.KDF import PBKDF2
+from Crypto.Random import get_random_bytes
+from hashlib import sha256
+import os
 
-# Функция генерации ключей
-def derive_keys(password, salt, k):
-    """Генерация k ключей из пароля"""
-    return [PBKDF2(password, salt, dkLen=32, count=100000, hmac_hash_module=lambda msg: sha256(msg).digest()) for _ in range(k)]
+def xor_bytes(*args):
+    """ Побитовый XOR для нескольких блоков. """
+    result = args[0]
+    for block in args[1:]:
+        result = bytes(a ^ b for a, b in zip(result, block))
+    return result
 
-# Дополнение данных до размера блока AES
 def pad(data):
-    padding_len = AES.block_size - (len(data) % AES.block_size)
-    return data + bytes([padding_len] * padding_len)
+    """ PKCS7 паддинг. """
+    pad_len = AES.block_size - (len(data) % AES.block_size)
+    return data + bytes([pad_len] * pad_len)
 
-# Удаление дополнения
 def unpad(data):
-    padding_len = data[-1]
-    return data[:-padding_len]
+    """ Удаление PKCS7 паддинга. """
+    return data[:-data[-1]]
 
-# Шифрование файла
-def encrypt_file(input_file, output_file, password, n, k):
-    salt = os.urandom(16)  # Генерация соли
-    keys = derive_keys(password, salt, k)  # Генерация k ключей
+def encrypt_block(data, keys):
+    """ Итеративное AES-шифрование блока с несколькими ключами. """
+    for key in keys:
+        cipher = AES.new(key, AES.MODE_ECB)
+        data = cipher.encrypt(data)
+    return data
 
-    iv = os.urandom(AES.block_size)  # Начальный вектор
-    prev_blocks = [b'\x00' * AES.block_size] * n  # Буфер для предыдущих n блоков
+def decrypt_block(data, keys):
+    """ Итеративная AES-дешифрация блока с несколькими ключами. """
+    for key in reversed(keys):
+        cipher = AES.new(key, AES.MODE_ECB)
+        data = cipher.decrypt(data)
+    return data
 
-    with open(input_file, 'rb') as f_in, open(output_file, 'wb') as f_out:
-        f_out.write(salt)  # Сохранение соли
-        f_out.write(iv)    # Сохранение IV
+def encrypt(data, keys, depth):
+    """ Основная функция шифрования """
+    data = pad(data)
+    blocks = [data[i:i+AES.block_size] for i in range(0, len(data), AES.block_size)]
+    encrypted_blocks = []
+    prev_blocks = [b"\x00" * AES.block_size] * depth  # Инициализация нулевыми блоками
+    
+    for block in blocks:
+        mixed_block = xor_bytes(block, *prev_blocks)
+        enc_block = encrypt_block(mixed_block, keys)
+        encrypted_blocks.append(enc_block)
+        prev_blocks.pop(0)
+        prev_blocks.append(enc_block)
+    
+    return b"".join(encrypted_blocks)
 
-        cipher = AES.new(keys[0], AES.MODE_CBC, iv)  # Первый ключ и IV
-        while True:
-            block = f_in.read(AES.block_size)
-            if not block:
-                break
-            if len(block) < AES.block_size:
-                block = pad(block)
+def decrypt(data, keys, depth):
+    """ Основная функция расшифровки """
+    blocks = [data[i:i+AES.block_size] for i in range(0, len(data), AES.block_size)]
+    decrypted_blocks = []
+    prev_blocks = [b"\x00" * AES.block_size] * depth
+    
+    for enc_block in blocks:
+        mixed_block = decrypt_block(enc_block, keys)
+        dec_block = xor_bytes(mixed_block, *prev_blocks)
+        decrypted_blocks.append(dec_block)
+        prev_blocks.pop(0)
+        prev_blocks.append(enc_block)
+    
+    return unpad(b"".join(decrypted_blocks))
 
-            # XOR с предыдущими блоками
-            for i in range(n):
-                block = bytes(a ^ b for a, b in zip(block, prev_blocks[i]))
+# === Преобразование строки в ключ ===
+def string_to_key(input_str, key_size=16):
+    """ Преобразует строку в фиксированный ключ (16, 24 или 32 байта). """
+    hash_value = sha256(input_str.encode()).digest()  # Хешируем строку
+    return hash_value[:key_size]  # Берем нужную длину ключа
 
-            encrypted_block = cipher.encrypt(block)
-            f_out.write(encrypted_block)
+# === Ввод параметров ===
+def get_keys(num_keys):
+    """ Функция получения ключей от пользователя. """
+    keys = []
+    choice = input("Вы хотите ввести ключи вручную? (y/n): ").strip().lower()
+    if choice == 'y':
+        for i in range(num_keys):
+            key_input = input(f"Введите ключ {i+1} (строка или hex): ")
+            if all(c in '0123456789abcdefABCDEF' for c in key_input) and len(key_input) in (32, 48, 64):
+                key = bytes.fromhex(key_input)  # Если введен hex, используем его
+            else:
+                key = string_to_key(key_input)  # Иначе, преобразуем строку в ключ
+            keys.append(key)
+    else:
+        keys = [get_random_bytes(16) for _ in range(num_keys)]
+        print("Сгенерированные ключи:")
+        for i, key in enumerate(keys):
+            print(f"Ключ {i+1}: {key.hex()}")
+    return keys
 
-            # Сдвиг буфера предыдущих блоков
-            prev_blocks.pop(0)
-            prev_blocks.append(encrypted_block)
+# === ГЛАВНАЯ ЛОГИКА ===
+mode = input("Выберите режим: (e) шифрование / (d) дешифрование: ").strip().lower()
+num_keys = int(input("Введите количество ключей: "))
+depth = int(input("Введите количество предыдущих блоков для XOR: "))
+keys = get_keys(num_keys)
 
-            # Переключение на следующий ключ (если k > 1)
-            cipher = AES.new(keys[len(prev_blocks) % k], AES.MODE_CBC, iv)
+if mode == 'e':
+    plaintext = input("Введите сообщение для шифрования: ").encode()
+    encrypted = encrypt(plaintext, keys, depth)
+    print("Encrypted:", encrypted.hex())
 
-# Расшифровка файла
-def decrypt_file(input_file, output_file, password, n, k):
-    with open(input_file, 'rb') as f_in:
-        salt = f_in.read(16)  # Читаем соль
-        iv = f_in.read(AES.block_size)  # Читаем IV
-        keys = derive_keys(password, salt, k)  # Восстанавливаем ключи
+elif mode == 'd':
+    encrypted_hex = input("Введите зашифрованные данные (hex): ")
+    encrypted = bytes.fromhex(encrypted_hex)
+    decrypted = decrypt(encrypted, keys, depth)
+    print("Decrypted:", decrypted.decode(errors='ignore'))
 
-        prev_blocks = [b'\x00' * AES.block_size] * n  # Буфер для предыдущих n блоков
-
-        with open(output_file, 'wb') as f_out:
-            cipher = AES.new(keys[0], AES.MODE_CBC, iv)
-
-            while True:
-                encrypted_block = f_in.read(AES.block_size)
-                if not encrypted_block:
-                    break
-
-                decrypted_block = cipher.decrypt(encrypted_block)
-
-                # Обратный XOR с предыдущими блоками
-                for i in range(n):
-                    decrypted_block = bytes(a ^ b for a, b in zip(decrypted_block, prev_blocks[i]))
-
-                if len(encrypted_block) < AES.block_size:
-                    decrypted_block = unpad(decrypted_block)
-
-                f_out.write(decrypted_block)
-
-                # Сдвиг буфера предыдущих блоков
-                prev_blocks.pop(0)
-                prev_blocks.append(encrypted_block)
-
-                # Переключение на следующий ключ (если k > 1)
-                cipher = AES.new(keys[len(prev_blocks) % k], AES.MODE_CBC, iv)
-
-# Тестовый запуск
-if __name__ == "__main__":
-    password = b"my_secure_password"
-    n = 2  # Используем предыдущие 2 блока
-    k = 3  # Используем 3 ключа
-
-    encrypt_file("input.txt", "encrypted.aes", password, n, k)
-    decrypt_file("encrypted.aes", "decrypted.txt", password, n, k)
+else:
+    print("Неверный режим работы!")
