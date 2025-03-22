@@ -1,7 +1,6 @@
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from hashlib import sha256
-import os
 
 def xor_bytes(*args):
     """ Побитовый XOR для нескольких блоков. """
@@ -64,48 +63,34 @@ def decrypt(data, keys, depth):
     
     return unpad(b"".join(decrypted_blocks))
 
-# === Преобразование строки в ключ ===
 def string_to_key(input_str, key_size=16):
     """ Преобразует строку в фиксированный ключ (16, 24 или 32 байта). """
     hash_value = sha256(input_str.encode()).digest()  # Хешируем строку
     return hash_value[:key_size]  # Берем нужную длину ключа
 
-# === Ввод параметров ===
-def get_keys(num_keys):
-    """ Функция получения ключей от пользователя. """
-    keys = []
-    choice = input("Вы хотите ввести ключи вручную? (y/n): ").strip().lower()
-    if choice == 'y':
-        for i in range(num_keys):
-            key_input = input(f"Введите ключ {i+1} (строка или hex): ")
-            if all(c in '0123456789abcdefABCDEF' for c in key_input) and len(key_input) in (32, 48, 64):
-                key = bytes.fromhex(key_input)  # Если введен hex, используем его
-            else:
-                key = string_to_key(key_input)  # Иначе, преобразуем строку в ключ
-            keys.append(key)
+def main():
+    import sys
+    import binascii
+
+    if len(sys.argv) < 6:
+        print("Usage: python aes_modified.py <mode> <data> <num_keys> <depth> <key1> [<key2> ...]")
+        sys.exit(1)
+
+    mode = sys.argv[1]
+    data = binascii.unhexlify(sys.argv[2])
+    num_keys = int(sys.argv[3])
+    depth = int(sys.argv[4])
+    keys = [binascii.unhexlify(key) for key in sys.argv[5:5+num_keys]]
+
+    if mode == 'e':
+        result = encrypt(data, keys, depth)
+    elif mode == 'd':
+        result = decrypt(data, keys, depth)
     else:
-        keys = [get_random_bytes(16) for _ in range(num_keys)]
-        print("Сгенерированные ключи:")
-        for i, key in enumerate(keys):
-            print(f"Ключ {i+1}: {key.hex()}")
-    return keys
+        print("Invalid mode. Use 'e' for encryption or 'd' for decryption.")
+        sys.exit(1)
 
-# === ГЛАВНАЯ ЛОГИКА ===
-mode = input("Выберите режим: (e) шифрование / (d) дешифрование: ").strip().lower()
-num_keys = int(input("Введите количество ключей: "))
-depth = int(input("Введите количество предыдущих блоков для XOR: "))
-keys = get_keys(num_keys)
+    print(binascii.hexlify(result).decode())
 
-if mode == 'e':
-    plaintext = input("Введите сообщение для шифрования: ").encode()
-    encrypted = encrypt(plaintext, keys, depth)
-    print("Encrypted:", encrypted.hex())
-
-elif mode == 'd':
-    encrypted_hex = input("Введите зашифрованные данные (hex): ")
-    encrypted = bytes.fromhex(encrypted_hex)
-    decrypted = decrypt(encrypted, keys, depth)
-    print("Decrypted:", decrypted.decode(errors='ignore'))
-
-else:
-    print("Неверный режим работы!")
+if __name__ == "__main__":
+    main()

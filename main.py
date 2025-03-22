@@ -1,87 +1,17 @@
-from Crypto.Cipher import AES
-from Crypto.Random import get_random_bytes
-from hashlib import sha256
-import os
-
-def xor_bytes(*args):
-    """ Побитовый XOR для нескольких блоков. """
-    result = args[0]
-    for block in args[1:]:
-        result = bytes(a ^ b for a, b in zip(result, block))
-    return result
-
-def pad(data):
-    """ PKCS7 паддинг. """
-    pad_len = AES.block_size - (len(data) % AES.block_size)
-    return data + bytes([pad_len] * pad_len)
-
-def unpad(data):
-    """ Удаление PKCS7 паддинга. """
-    return data[:-data[-1]]
-
-def encrypt_block(data, keys):
-    """ Итеративное AES-шифрование блока с несколькими ключами. """
-    for key in keys:
-        cipher = AES.new(key, AES.MODE_ECB)
-        data = cipher.encrypt(data)
-    return data
-
-def decrypt_block(data, keys):
-    """ Итеративная AES-дешифрация блока с несколькими ключами. """
-    for key in reversed(keys):
-        cipher = AES.new(key, AES.MODE_ECB)
-        data = cipher.decrypt(data)
-    return data
-
-def encrypt(data, keys, depth):
-    """ Основная функция шифрования """
-    data = pad(data)
-    blocks = [data[i:i+AES.block_size] for i in range(0, len(data), AES.block_size)]
-    encrypted_blocks = []
-    prev_blocks = [b"\x00" * AES.block_size] * depth  
-    
-    for block in blocks:
-        mixed_block = xor_bytes(block, *prev_blocks)
-        enc_block = encrypt_block(mixed_block, keys)
-        encrypted_blocks.append(enc_block)
-        prev_blocks.pop(0)
-        prev_blocks.append(enc_block)
-    
-    return b"".join(encrypted_blocks)
-
-def decrypt(data, keys, depth):
-    """ Основная функция расшифровки """
-    blocks = [data[i:i+AES.block_size] for i in range(0, len(data), AES.block_size)]
-    decrypted_blocks = []
-    prev_blocks = [b"\x00" * AES.block_size] * depth
-    
-    for enc_block in blocks:
-        mixed_block = decrypt_block(enc_block, keys)
-        dec_block = xor_bytes(mixed_block, *prev_blocks)
-        decrypted_blocks.append(dec_block)
-        prev_blocks.pop(0)
-        prev_blocks.append(enc_block)
-    
-    return unpad(b"".join(decrypted_blocks))
-
-
-def string_to_key(input_str, key_size=16):
-    """ Преобразует строку в фиксированный ключ (16, 24 или 32 байта). """
-    hash_value = sha256(input_str.encode()).digest()  
-    return hash_value[:key_size]  
-
-
 def get_keys(num_keys):
     """ Функция получения ключей от пользователя. """
+    from aes_modified import string_to_key
+    from Crypto.Random import get_random_bytes
+
     keys = []
     choice = input("Вы хотите ввести ключи вручную? (y/n): ").strip().lower()
     if choice == 'y':
         for i in range(num_keys):
             key_input = input(f"Введите ключ {i+1} (строка или hex): ")
             if all(c in '0123456789abcdefABCDEF' for c in key_input) and len(key_input) in (32, 48, 64):
-                key = bytes.fromhex(key_input)  
+                key = bytes.fromhex(key_input)  # Если введен hex, используем его
             else:
-                key = string_to_key(key_input)  
+                key = string_to_key(key_input)  # Иначе, преобразуем строку в ключ
             keys.append(key)
     else:
         keys = [get_random_bytes(16) for _ in range(num_keys)]
@@ -90,22 +20,90 @@ def get_keys(num_keys):
             print(f"Ключ {i+1}: {key.hex()}")
     return keys
 
+def main():
+    while True:
+        print("Выберите шифр:")
+        print("1. Цезарь")
+        print("2. Виженер")
+        print("3. Квадратичный шифр")
+        print("4. AES")
+        print("5. Модифицированный AES")
+        print("6. Выйти")
+        
+        choice = input("Введите номер шифра: ")
+        
+        if choice == '1':
+            from caesar import caesar_encrypt, caesar_decrypt
+            action = input("Шифрование (e) или дешифрование (d): ")
+            text = input("Введите текст: ")
+            shift = int(input("Введите сдвиг: "))
+            if action == 'e':
+                print(caesar_encrypt(text, shift))
+            else:
+                print(caesar_decrypt(text, shift))
+        
+        elif choice == '2':
+            from vigenere import vigenere_encrypt, vigenere_decrypt
+            action = input("Шифрование (e) или дешифрование (d): ")
+            text = input("Введите текст: ")
+            key = input("Введите ключ: ")
+            if action == 'e':
+                print(vigenere_encrypt(text, key))
+            else:
+                print(vigenere_decrypt(text, key))
+        
+        elif choice == '3':
+            from quadratic_cipher import quadratic_encrypt, quadratic_decrypt
+            action = input("Шифрование (e) или дешифрование (d): ")
+            if action == 'e':
+                text = input("Введите текст для шифрования: ")
+                a = int(input("Введите a (не 0): "))
+                b = int(input("Введите b: "))
+                c = int(input("Введите c: "))
+                m = int(input("Введите m (256 или больше, лучше простое число): "))
+                print(quadratic_encrypt(text, a, b, c, m))
+            else:
+                encrypted = input("Введите зашифрованные данные (через запятую): ")
+                encrypted = [int(x) for x in encrypted.split(',')]
+                a = int(input("Введите a (не 0): "))
+                b = int(input("Введите b: "))
+                c = int(input("Введите c: "))
+                m = int(input("Введите m (256 или больше, лучше простое число): "))
+                print(quadratic_decrypt(encrypted, a, b, c, m))
+        
+        elif choice == '4':
+            from aes import aes_encrypt, aes_decrypt
+            action = input("Шифрование (e) или дешифрование (d): ")
+            text = input("Введите текст: ")
+            key = input("Введите ключ: ")
+            if action == 'e':
+                print(aes_encrypt(text, key))
+            else:
+                print(aes_decrypt(text, key))
+        
+        elif choice == '5':
+            from aes_modified import encrypt, decrypt
+            action = input("Шифрование (e) или дешифрование (d): ")
+            if action == 'e':
+                text = input("Введите текст: ").encode()  # Преобразуем текст в bytes
+                num_keys = int(input("Введите количество ключей: "))
+                depth = int(input("Введите количество предыдущих блоков для XOR: "))
+                keys = get_keys(num_keys)
+                print(encrypt(text, keys, depth).hex())
+            else:
+                encrypted_hex = input("Введите зашифрованные данные (hex): ")
+                encrypted = bytes.fromhex(encrypted_hex)
+                num_keys = int(input("Введите количество ключей: "))
+                depth = int(input("Введите количество предыдущих блоков для XOR: "))
+                keys = get_keys(num_keys)
+                print(decrypt(encrypted, keys, depth).decode(errors='ignore'))
+        
+        elif choice == '6':
+            print("Выход из программы.")
+            break
+        
+        else:
+            print("Неверный выбор")
 
-mode = input("Выберите режим: (e) шифрование / (d) дешифрование: ").strip().lower()
-num_keys = int(input("Введите количество ключей: "))
-depth = int(input("Введите количество предыдущих блоков для XOR: "))
-keys = get_keys(num_keys)
-
-if mode == 'e':
-    plaintext = input("Введите сообщение для шифрования: ").encode()
-    encrypted = encrypt(plaintext, keys, depth)
-    print("Encrypted:", encrypted.hex())
-
-elif mode == 'd':
-    encrypted_hex = input("Введите зашифрованные данные (hex): ")
-    encrypted = bytes.fromhex(encrypted_hex)
-    decrypted = decrypt(encrypted, keys, depth)
-    print("Decrypted:", decrypted.decode(errors='ignore'))
-
-else:
-    print("Неверный режим работы!")
+if __name__ == "__main__":
+    main()
