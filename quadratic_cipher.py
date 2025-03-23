@@ -17,11 +17,14 @@ def quadratic_decrypt(encrypted, a, b, c, m):
         # Решаем квадратное уравнение для каждого зашифрованного символа
         equation = Eq(a * x**2 + b * x + c, enc_char % m)
         solutions = solve(equation, x)
-        # Берем целочисленное решение, которое является символом
+        # Ищем допустимое целочисленное решение
         for sol in solutions:
-            if sol.is_integer:
+            if sol.is_integer and 0 <= sol <= 255:  # Проверяем, что решение в диапазоне ASCII
                 decrypted.append(chr(int(sol)))
                 break
+        else:
+            # Если решение не найдено, добавляем пробел (или можно выбросить ошибку)
+            decrypted.append(' ')
     return ''.join(decrypted)
 
 def main():
