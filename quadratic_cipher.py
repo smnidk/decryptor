@@ -11,7 +11,11 @@ def get_user_input(prompt, min_value, max_value):
         except ValueError:
             print("Ошибка! Введите целое число.")
 
-def encrypt(text, a, b, c, m):
+def quadratic_encrypt(text, a, b, c, m):
+    if a == 0:
+        raise ValueError("Параметр 'a' не может быть равен нулю.")
+    if m < 256:
+        raise ValueError("Параметр 'm' должен быть не меньше 256.")
     return [(a * (ord(ch) ** 2) + b * ord(ch) + c) % m for ch in text]
 
 def modular_sqrt(a, p):
@@ -20,7 +24,12 @@ def modular_sqrt(a, p):
         return None  
     return sorted(sqrt_mod(a, p, all_roots=True))
 
-def decrypt_affine_quadratic(encrypted_text, a, b, c, m, original_text):
+def quadratic_decrypt(encrypted_text, a, b, c, m, original_text):
+    if a == 0:
+        raise ValueError("Параметр 'a' не может быть равен нулю.")
+    if m < 256:
+        raise ValueError("Параметр 'm' должен быть не меньше 256.")
+    
     decrypted_text = []
     
     for i, y in enumerate(encrypted_text):
@@ -39,8 +48,8 @@ def decrypt_affine_quadratic(encrypted_text, a, b, c, m, original_text):
                 x2 = ((-b - sqrt_val) * inv) % m
                 possible_x.update([x1, x2])
             except ValueError:
-                continue  
-
+                continue
+        
         valid_chars = [chr(x) for x in possible_x if 32 <= x <= 126]
         
         # Выбираем символ, который ближе к оригиналу
@@ -53,17 +62,18 @@ def decrypt_affine_quadratic(encrypted_text, a, b, c, m, original_text):
 
     return "".join(decrypted_text)
 
-# 🔹 Запуск программы
-print("Введите параметры для шифрования:")
-a = get_user_input("Введите a (не 0): ", 1, 1000)
-b = get_user_input("Введите b: ", 0, 1000)
-c = get_user_input("Введите c: ", 0, 1000)
-m = get_user_input("Введите m (256 или больше, лучше простое число): ", 256, 10000)
+if __name__ == "__main__":
+    # 🔹 Запуск программы
+    print("Введите параметры для шифрования:")
+    a = get_user_input("Введите a (не 0): ", 1, 1000)
+    b = get_user_input("Введите b: ", 0, 1000)
+    c = get_user_input("Введите c: ", 0, 1000)
+    m = get_user_input("Введите m (256 или больше, лучше простое число): ", 256, 10000)
 
-text = input("Введите текст для шифрования: ")
-cipher = encrypt(text, a, b, c, m)
-print(f"\nЗашифрованный текст: {cipher}")
+    text = input("Введите текст для шифрования: ")
+    cipher = quadratic_encrypt(text, a, b, c, m)
+    print(f"\nЗашифрованный текст: {cipher}")
 
-# 🔹 Расшифровка (с учётом оригинального текста)
-decrypted = decrypt_affine_quadratic(cipher, a, b, c, m, text)
-print(f"Расшифрованный текст: {decrypted}")
+    # 🔹 Расшифровка (с учётом оригинального текста)
+    decrypted = quadratic_decrypt(cipher, a, b, c, m, text)
+    print(f"Расшифрованный текст: {decrypted}")

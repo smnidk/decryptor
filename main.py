@@ -1,111 +1,190 @@
-from Crypto.Cipher import AES
-from Crypto.Random import get_random_bytes
-from hashlib import sha256
+import flet as ft
 import os
+import binascii
+from aes_modified import string_to_key, encrypt, decrypt
+from caesar import caesar_encrypt, caesar_decrypt
+from vigenere import vigenere_encrypt, vigenere_decrypt
+from quadratic_cipher import quadratic_encrypt, quadratic_decrypt
+from aes import aes_encrypt, aes_decrypt
 
-def xor_bytes(*args):
-    """ Побитовый XOR для нескольких блоков. """
-    result = args[0]
-    for block in args[1:]:
-        result = bytes(a ^ b for a, b in zip(result, block))
-    return result
+def main(page: ft.Page):
+    page.title = "Encryptor"
+    page.window_width = 400
+    page.window_height = 500
 
-def pad(data):
-    """ PKCS7 паддинг. """
-    pad_len = AES.block_size - (len(data) % AES.block_size)
-    return data + bytes([pad_len] * pad_len)
+    # Функция для обновления полей ввода ключей
+    def update_key_inputs(e=None):
+        """Обновляет поля для ввода ключей в модифицированном AES."""
+        num_keys = int(input_fields["num_keys"].value) if input_fields["num_keys"].value.isdigit() else 0
+        while len(key_inputs) < num_keys:
+            key_input = ft.TextField(label=f"Введите ключ {len(key_inputs) + 1}:")
+            key_inputs.append(key_input)
+            # Добавляем поле для ключа перед результатом
+            scroll_column.controls.insert(-2, key_input)
+        while len(key_inputs) > num_keys:
+            key_input = key_inputs.pop()
+            scroll_column.controls.remove(key_input)
+        for i, key_input in enumerate(key_inputs):
+            key_input.visible = True
+            key_input.label = f"Введите ключ {i + 1}:"
+        page.update()
 
-def unpad(data):
-    """ Удаление PKCS7 паддинга. """
-    return data[:-data[-1]]
+    # Функция для генерации случайных ключей в формате hex
+    def generate_keys(e):
+        method = method_combo.value
+        if method == "AES":
+            key = binascii.hexlify(os.urandom(16)).decode()
+            input_fields["key"].value = key
+        elif method == "Модифицированный AES":
+            for key_input in key_inputs:
+                key = binascii.hexlify(os.urandom(16)).decode()
+                key_input.value = key
+        page.update()
 
-def encrypt_block(data, keys):
-    """ Итеративное AES-шифрование блока с несколькими ключами. """
-    for key in keys:
-        cipher = AES.new(key, AES.MODE_ECB)
-        data = cipher.encrypt(data)
-    return data
+    # Поля ввода
+    key_inputs = []
+    input_fields = {
+        "key": ft.TextField(label="Введите ключ:"),
+        "param": ft.TextField(label="Введите параметры:"),
+        "a": ft.TextField(label="Введите a:"),
+        "b": ft.TextField(label="Введите b:"),
+        "c": ft.TextField(label="Введите c:"),
+        "m": ft.TextField(label="Введите m:"),
+        "num_keys": ft.TextField(label="Введите количество ключей:", on_change=update_key_inputs),
+        "depth": ft.TextField(label="Введите глубину:"),
+    }
 
-def decrypt_block(data, keys):
-    """ Итеративная AES-дешифрация блока с несколькими ключами. """
-    for key in reversed(keys):
-        cipher = AES.new(key, AES.MODE_ECB)
-        data = cipher.decrypt(data)
-    return data
+    # Методы шифрования и их параметры
+    methods = {
+        "Цезарь": {"param": "Введите сдвиг:"},
+        "Виженер": {"key": "Введите ключ:"},
+        "Квадратичный шифр": {"a": "Введите a:", "b": "Введите b:", "c": "Введите c:", "m": "Введите m:"},
+        "AES": {"key": "Введите ключ:"},
+        "Модифицированный AES": {"num_keys": "Введите количество ключей:", "depth": "Введите глубину:"},
+    }
 
-def encrypt(data, keys, depth):
-    """ Основная функция шифрования """
-    data = pad(data)
-    blocks = [data[i:i+AES.block_size] for i in range(0, len(data), AES.block_size)]
-    encrypted_blocks = []
-    prev_blocks = [b"\x00" * AES.block_size] * depth  
-    
-    for block in blocks:
-        mixed_block = xor_bytes(block, *prev_blocks)
-        enc_block = encrypt_block(mixed_block, keys)
-        encrypted_blocks.append(enc_block)
-        prev_blocks.pop(0)
-        prev_blocks.append(enc_block)
-    
-    return b"".join(encrypted_blocks)
+    def update_params(e):
+        """Обновляет видимость полей ввода в зависимости от выбранного метода."""
+        method = method_combo.value
+        for field in input_fields.values():
+            field.visible = False
+            field.label = ""
 
-def decrypt(data, keys, depth):
-    """ Основная функция расшифровки """
-    blocks = [data[i:i+AES.block_size] for i in range(0, len(data), AES.block_size)]
-    decrypted_blocks = []
-    prev_blocks = [b"\x00" * AES.block_size] * depth
-    
-    for enc_block in blocks:
-        mixed_block = decrypt_block(enc_block, keys)
-        dec_block = xor_bytes(mixed_block, *prev_blocks)
-        decrypted_blocks.append(dec_block)
-        prev_blocks.pop(0)
-        prev_blocks.append(enc_block)
-    
-    return unpad(b"".join(decrypted_blocks))
+        if method in methods:
+            for param, label in methods[method].items():
+                input_fields[param].visible = True
+                input_fields[param].label = label
 
+        if method == "Модифицированный AES":
+            update_key_inputs()
+        else:
+            # Очистка полей ввода ключей при переключении метода
+            key_inputs.clear()
+            scroll_column.controls = [
+                action_label,
+                action_combo,
+                method_label,
+                method_combo,
+                text_label,
+                text_input,
+                *input_fields.values(),
+                result_label,
+                result_output,
+                process_button,
+                generate_button,  # Добавляем кнопку генерации ключей
+            ]
 
-def string_to_key(input_str, key_size=16):
-    """ Преобразует строку в фиксированный ключ (16, 24 или 32 байта). """
-    hash_value = sha256(input_str.encode()).digest()  
-    return hash_value[:key_size]  
+        page.update()
 
+    def process(e):
+        """Обрабатывает шифрование или дешифрование."""
+        action = action_combo.value
+        method = method_combo.value
+        text = text_input.value
 
-def get_keys(num_keys):
-    """ Функция получения ключей от пользователя. """
-    keys = []
-    choice = input("Вы хотите ввести ключи вручную? (y/n): ").strip().lower()
-    if choice == 'y':
-        for i in range(num_keys):
-            key_input = input(f"Введите ключ {i+1} (строка или hex): ")
-            if all(c in '0123456789abcdefABCDEF' for c in key_input) and len(key_input) in (32, 48, 64):
-                key = bytes.fromhex(key_input)  
+        try:
+            if method == "Цезарь":
+                shift = int(input_fields["param"].value)
+                result = caesar_encrypt(text, shift) if action == "Шифрование" else caesar_decrypt(text, shift)
+            elif method == "Виженер":
+                key = input_fields["key"].value
+                result = vigenere_encrypt(text, key) if action == "Шифрование" else vigenere_decrypt(text, key)
+            elif method == "Квадратичный шифр":
+                a = int(input_fields["a"].value)
+                b = int(input_fields["b"].value)
+                c = int(input_fields["c"].value)
+                m = int(input_fields["m"].value)
+                if action == "Шифрование":
+                    result = quadratic_encrypt(text, a, b, c, m)
+                else:
+                    # Убираем пробелы и преобразуем строку в список чисел
+                    encrypted = [int(x.strip()) for x in text.split(",") if x.strip()]
+                    result = quadratic_decrypt(encrypted, a, b, c, m, "")
+            elif method == "AES":
+                key = input_fields["key"].value
+                result = aes_encrypt(text, key) if action == "Шифрование" else aes_decrypt(text, key)
+            elif method == "Модифицированный AES":
+                num_keys = int(input_fields["num_keys"].value)
+                depth = int(input_fields["depth"].value)
+                keys = [string_to_key(key_input.value) for key_input in key_inputs]
+                if action == "Шифрование":
+                    result = encrypt(text.encode(), keys, depth).hex()
+                else:
+                    try:
+                        encrypted = bytes.fromhex(text)
+                        result = decrypt(encrypted, keys, depth).decode(errors="ignore")
+                    except ValueError:
+                        result = "Ошибка: Введенный текст не является допустимой шестнадцатеричной строкой"
             else:
-                key = string_to_key(key_input)  
-            keys.append(key)
-    else:
-        keys = [get_random_bytes(16) for _ in range(num_keys)]
-        print("Сгенерированные ключи:")
-        for i, key in enumerate(keys):
-            print(f"Ключ {i+1}: {key.hex()}")
-    return keys
+                result = "Неверный метод шифрования"
+        except Exception as e:
+            result = f"Ошибка: {str(e)}"
 
+        result_output.value = result
+        page.update()
 
-mode = input("Выберите режим: (e) шифрование / (d) дешифрование: ").strip().lower()
-num_keys = int(input("Введите количество ключей: "))
-depth = int(input("Введите количество предыдущих блоков для XOR: "))
-keys = get_keys(num_keys)
+    # Элементы интерфейса
+    action_label = ft.Text("Выберите действие:")
+    action_combo = ft.Dropdown(options=[ft.dropdown.Option("Шифрование"), ft.dropdown.Option("Дешифрование")])
 
-if mode == 'e':
-    plaintext = input("Введите сообщение для шифрования: ").encode()
-    encrypted = encrypt(plaintext, keys, depth)
-    print("Encrypted:", encrypted.hex())
+    method_label = ft.Text("Выберите метод шифрования:")
+    method_combo = ft.Dropdown(
+        options=[ft.dropdown.Option(method) for method in methods.keys()],
+        on_change=update_params,
+    )
 
-elif mode == 'd':
-    encrypted_hex = input("Введите зашифрованные данные (hex): ")
-    encrypted = bytes.fromhex(encrypted_hex)
-    decrypted = decrypt(encrypted, keys, depth)
-    print("Decrypted:", decrypted.decode(errors='ignore'))
+    text_label = ft.Text("Введите текст:")
+    text_input = ft.TextField(multiline=True)
 
-else:
-    print("Неверный режим работы!")
+    result_label = ft.Text("Результат:")
+    result_output = ft.TextField(read_only=True, multiline=True)
+
+    process_button = ft.ElevatedButton(text="Выполнить", on_click=process)
+
+    generate_button = ft.ElevatedButton(text="Сгенерировать ключи", on_click=generate_keys)
+
+    # Создаем колонку с прокруткой
+    scroll_column = ft.Column(
+        controls=[
+            action_label,
+            action_combo,
+            method_label,
+            method_combo,
+            text_label,
+            text_input,
+            *input_fields.values(),
+            result_label,
+            result_output,
+            process_button,
+            generate_button,  # Добавляем кнопку генерации ключей
+        ],
+        scroll=True,  # Включаем прокрутку
+        expand=True,  # Растягиваем колонку на всю доступную высоту
+    )
+
+    # Добавляем колонку на страницу
+    page.add(scroll_column)
+
+    update_params(None)  # Инициализация параметров
+
+ft.app(target=main)
