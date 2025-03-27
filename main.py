@@ -2,6 +2,9 @@ import flet as ft
 import os
 import binascii
 from aes_modified import string_to_key, encrypt, decrypt
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+from aes_modified import string_to_key, encrypt, decrypt
 from caesar import caesar_encrypt, caesar_decrypt
 from vigenere import vigenere_encrypt, vigenere_decrypt
 from quadratic_cipher import quadratic_encrypt, quadratic_decrypt
@@ -52,6 +55,7 @@ def main(page: ft.Page):
         "m": ft.TextField(label="Введите m:"),
         "num_keys": ft.TextField(label="Введите количество ключей:", on_change=update_key_inputs),
         "depth": ft.TextField(label="Введите глубину:"),
+        "rsa_key": ft.TextField(label="Введите путь к RSA ключу:"),
     }
 
     # Методы шифрования и их параметры
@@ -60,7 +64,7 @@ def main(page: ft.Page):
         "Виженер": {"key": "Введите ключ:"},
         "Квадратичный шифр": {"a": "Введите a:", "b": "Введите b:", "c": "Введите c:", "m": "Введите m:"},
         "AES": {"key": "Введите ключ:"},
-        "Модифицированный AES": {"num_keys": "Введите количество ключей:", "depth": "Введите глубину:"},
+        "Модифицированный AES": {"num_keys": "Введите количество ключей:", "depth": "Введите глубину:", "rsa_key": "Введите путь к RSA ключу:"},
     }
 
     def update_params(e):
@@ -108,6 +112,8 @@ def main(page: ft.Page):
                 result = caesar_encrypt(text, shift) if action == "Шифрование" else caesar_decrypt(text, shift)
             elif method == "Виженер":
                 key = input_fields["key"].value
+                if not key:
+                    raise ValueError("Ключ не может быть пустым. Пожалуйста, введите ключ.")
                 result = vigenere_encrypt(text, key) if action == "Шифрование" else vigenere_decrypt(text, key)
             elif method == "Квадратичный шифр":
                 a = int(input_fields["a"].value)
@@ -122,23 +128,60 @@ def main(page: ft.Page):
                     result = quadratic_decrypt(encrypted, a, b, c, m, "")
             elif method == "AES":
                 key = input_fields["key"].value
+                if not key:
+                    raise ValueError("Ключ не может быть пустым. Пожалуйста, введите ключ.")
                 result = aes_encrypt(text, key) if action == "Шифрование" else aes_decrypt(text, key)
             elif method == "Модифицированный AES":
                 num_keys = int(input_fields["num_keys"].value)
                 depth = int(input_fields["depth"].value)
+                rsa_key_path = input_fields["rsa_key"].value
+                if not rsa_key_path:
+                    raise ValueError("Путь к RSA ключу не может быть пустым. Пожалуйста, введите путь к RSA ключу.")
                 keys = [string_to_key(key_input.value) for key_input in key_inputs]
+                if any(not key for key in keys):
+                    raise ValueError("Все ключи должны быть заполнены. Пожалуйста, введите все ключи.")
+                
+                # Загрузка RSA ключа
+                with open(rsa_key_path, 'rb') as f:
+                    rsa_key = RSA.import_key(f.read())
+                cipher_rsa = PKCS1_OAEP.new(rsa_key)
+                
                 if action == "Шифрование":
-                    result = encrypt(text.encode(), keys, depth).hex()
+                    # Шифрование AES-ключей
+                    encrypted_aes_keys = [cipher_rsa.encrypt(key) for key in keys]
+                    encrypted_keys_block = b''.join(encrypted_aes_keys)
+                    
+                    # Шифрование данных
+                    encrypted_data = encrypt(text.encode(), keys, depth)
+                    final_output = encrypted_keys_block + encrypted_data
+                    result = binascii.hexlify(final_output).decode()
                 else:
                     try:
-                        encrypted = bytes.fromhex(text)
-                        result = decrypt(encrypted, keys, depth).decode(errors="ignore")
+                        encrypted_data = bytes.fromhex(text)
+                        rsa_block_size = rsa_key.size_in_bytes()
+                        encrypted_keys_size = num_keys * rsa_block_size
+
+                        if len(encrypted_data) < encrypted_keys_size:
+                            raise ValueError("Недостаточно данных для извлечения ключей.")
+                        
+                        encrypted_keys_block = encrypted_data[:encrypted_keys_size]
+                        encrypted_data = encrypted_data[encrypted_keys_size:]
+                        
+                        # Извлечение и расшифрование AES-ключей
+                        encrypted_aes_keys = [encrypted_keys_block[i*rsa_block_size:(i+1)*rsa_block_size] for i in range(num_keys)]
+                        aes_keys = [cipher_rsa.decrypt(enc_key) for enc_key in encrypted_aes_keys]
+                        
+                        # Дешифрование данных
+                        decrypted_data = decrypt(encrypted_data, aes_keys, depth)
+                        result = decrypted_data.decode(errors="ignore")
                     except ValueError:
-                        result = "Ошибка: Введенный текст не является допустимой шестнадцатеричной строкой"
+                        result = "Ошибка: Введенный текст не является допустимой шестнадцатеричной строкой. Пожалуйста, введите корректный текст."
             else:
-                result = "Неверный метод шифрования"
+                result = "Неверный метод шифрования. Пожалуйста, выберите корректный метод."
+        except ValueError as ve:
+            result = f"Ошибка: {str(ve)}"
         except Exception as e:
-            result = f"Ошибка: {str(e)}"
+            result = f"Произошла ошибка: {str(e)}. Пожалуйста, проверьте введенные данные и попробуйте снова."
 
         result_output.value = result
         page.update()
