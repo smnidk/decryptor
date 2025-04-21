@@ -11,55 +11,55 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-    - name: Install dependencies
-      run: |
-        pip install pytest pyinstaller black flake8  # Убрана установка из requirements.txt
+      - name: Install dependencies
+        run: |
+          pip install pytest pyinstaller black flake8
 
-    - name: Code style check (Black)
-      run: black --check src/
+      - name: Code style check (Black)
+        run: black --check src/decryptor/
 
-    - name: Lint with flake8
-      run: flake8 src/
+      - name: Lint with flake8
+        run: flake8 src/decryptor/
 
-    - name: Run tests
-      run: pytest -v src/decryptor/tests/
+      - name: Run tests
+        run: pytest -v src/decryptor/tests/
 
-    - name: Build executable
-      run: |
-        pyinstaller --onefile src/decryptor/main.py
-        mkdir -p dist
-        cp dist/main dist/decryptor
+      - name: Build executable
+        run: |
+          pyinstaller --onefile src/decryptor/main.py
+          mkdir -p dist
+          cp dist/main dist/decryptor
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: decryptor
-        path: dist/decryptor
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: decryptor
+          path: dist/decryptor
 
   deploy:
-    needs: build-and-test    
+    needs: build-and-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
-    
-    steps:
-    - name: Download artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: decryptor
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        files: decryptor
-        tag_name: v1.0.0
-        body: "Автоматический релиз"
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: decryptor
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: decryptor
+          tag_name: v1.0.0
+          body: "Автоматический релиз"
