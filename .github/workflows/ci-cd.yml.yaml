@@ -17,11 +17,8 @@ jobs:
       - name: Print current directory
         run: pwd
 
-      - name: Debug repository structure (root)
+      - name: Debug repository structure
         run: ls -R
-
-      - name: Debug repository structure (src/decryptor)
-        run: ls -R src/decryptor || echo "Directory src/decryptor does not exist"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -32,19 +29,25 @@ jobs:
         run: pip install pytest pyinstaller black flake8
 
       - name: Code style check (Black)
-        run: black --check src/decryptor || echo "Directory src/decryptor does not exist or no files to check"
+        run: black --check src/decryptor/
 
       - name: Lint with flake8
-        run: flake8 src/decryptor/ || echo "Directory src/decryptor does not exist or no files to lint"
+        run: flake8 src/decryptor/
 
       - name: Run tests
-        run: pytest -v src/decryptor/tests/ || echo "No tests found in src/decryptor/tests/"
+        run: pytest -v src/decryptor/tests/
+
+      - name: Create build directory
+        run: mkdir -p src/decryptor/build
+
+      - name: Build artifact
+        run: pyinstaller --onefile src/decryptor/main.py --distpath src/decryptor/build
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
           name: decryptor
-          path: src/decryptor/build/ # Replace with the correct artifact path
+          path: src/decryptor/build/
 
   deploy:
     needs: build-and-test
@@ -54,7 +57,7 @@ jobs:
 
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v3 # Fixed version
+        uses: actions/download-artifact@v3
         with:
           name: decryptor
 
@@ -63,5 +66,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: decryptor
+          files: src/decryptor/build/main
           tag_name: v1.0.0
