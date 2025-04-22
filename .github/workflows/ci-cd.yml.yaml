@@ -47,21 +47,21 @@ jobs:
           path: src/decryptor/build/ # Replace with the correct artifact path
 
   deploy:
-  needs: build-and-test
-  runs-on: ubuntu-latest
-  permissions:
-    contents: write
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
-  steps:
-    - name: Download artifact
-      uses: actions/download-artifact@v4 
-      with:
-        name: decryptor 
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v3 # Fixed version
+        with:
+          name: decryptor
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        files: decryptor  
-        tag_name: v1.0.0
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: decryptor
+          tag_name: v1.0.0
