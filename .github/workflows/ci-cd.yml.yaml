@@ -3,8 +3,6 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [master]
-  pull_request:
-    branches: [master]
 
 jobs:
   build-and-test:
@@ -13,6 +11,17 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Print current directory
+        run: pwd
+
+      - name: Debug repository structure (root)
+        run: ls -R
+
+      - name: Debug repository structure (src/decryptor)
+        run: ls -R src/decryptor || echo "Directory src/decryptor does not exist"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -20,38 +29,28 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: |
-          pip install pytest pyinstaller black flake8
+        run: pip install pytest pyinstaller black flake8
 
       - name: Code style check (Black)
-        run: black --check src/decryptor/
+        run: black --check src/my_decryptor/
 
       - name: Lint with flake8
-        run: flake8 src/decryptor/
+        run: flake8 src/my_decryptor/
 
       - name: Run tests
-        run: pytest -v src/decryptor/tests/
-
-      - name: Build executable
-        run: |
-          pyinstaller --onefile src/decryptor/main.py
-          mkdir -p dist
-          cp dist/main dist/decryptor
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: decryptor
-          path: dist/decryptor
+        run: pytest -v src/my_decryptor/tests/
 
   deploy:
-    needs: build-and-test  
+    needs: build-and-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
-    permissions:
-      contents: write  
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Download artifact
         uses: actions/download-artifact@v3
         with:
@@ -64,4 +63,3 @@ jobs:
         with:
           files: decryptor
           tag_name: v1.0.0
-          body: "Автоматический релиз"
