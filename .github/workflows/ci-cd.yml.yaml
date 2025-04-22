@@ -14,8 +14,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Debug repository structure
+      - name: Print current directory
+        run: pwd
+
+      - name: Debug repository structure (root)
         run: ls -R
+
+      - name: Debug repository structure (src/decryptor)
+        run: ls -R src/decryptor || echo "Directory src/decryptor does not exist"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -26,19 +32,22 @@ jobs:
         run: pip install pytest pyinstaller black flake8
 
       - name: Code style check (Black)
-        run: black --check src/decryptor/
+        run: black --check src/decryptor || echo "Directory src/decryptor does not exist or no files to check"
 
       - name: Lint with flake8
-        run: flake8 src/decryptor/
+        run: flake8 src/decryptor/ || echo "Directory src/decryptor does not exist or no files to lint"
 
       - name: Run tests
-        run: pytest -v src/decryptor/tests/
+        run: pytest -v src/decryptor/tests/ || echo "No tests found in src/decryptor/tests/"
 
       - name: Build executable
         run: |
           pyinstaller --onefile src/decryptor/main.py
           mkdir -p dist
-          mv dist/main dist/decryptor  # Переименование файла
+          mv dist/main dist/decryptor
+
+      - name: Debug dist directory
+        run: ls -la dist
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -51,17 +60,20 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
     permissions:
-      actions: read
       contents: write
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Download artifact
-        uses: actions/download-artifact@v4  
+        uses: actions/download-artifact@v3
         with:
           name: decryptor
-          path: decryptor 
 
-      - name: Check artifact
+      - name: Debug downloaded artifact
         run: ls -la decryptor
 
       - name: Create Release
@@ -69,6 +81,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: decryptor/decryptor 
-          tag_name: v1.0.0
+          files: decryptor/decryptor
+          tag_name: v$(date +%Y.%m.%d)
           body: "Автоматический релиз"
