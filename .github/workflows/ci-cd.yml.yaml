@@ -41,25 +41,26 @@ jobs:
         run: pytest -v src/decryptor/tests/ || echo "No tests found in src/decryptor/tests/"
 
   deploy:
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
+  needs: build-and-test
+  runs-on: ubuntu-latest
+  if: github.ref == 'refs/heads/master'
+  permissions:
+    contents: write  
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+  steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: decryptor
 
-      - name: Download artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: decryptor
+    - name: Check artifact
+      run: ls -la decryptor  
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          files: decryptor
-          tag_name: v1.0.0
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        files: decryptor 
+        tag_name: v1.0.0
+        body: "Автоматический релиз"
