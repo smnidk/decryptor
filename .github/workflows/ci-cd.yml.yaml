@@ -29,24 +29,19 @@ jobs:
         run: pip install pytest pyinstaller black flake8
 
       - name: Code style check (Black)
-        run: black --check decryptor/
+        run: black --check src/decryptor/
+
       - name: Lint with flake8
         run: flake8 src/decryptor/
 
       - name: Run tests
         run: pytest -v src/decryptor/tests/
 
-      - name: Create build directory
-        run: mkdir -p src/decryptor/build
-
       - name: Build artifact
         run: pyinstaller --onefile src/decryptor/main.py --distpath src/decryptor/build
 
-      - name: Debug build directory
-        run: ls -l src/decryptor/build/
-
       - name: Upload artifact
-        uses: actions/upload-artifact@v4 
+        uses: actions/upload-artifact@v4
         with:
           name: decryptor
           path: src/decryptor/build/
