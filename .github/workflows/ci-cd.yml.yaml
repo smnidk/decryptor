@@ -17,11 +17,8 @@ jobs:
       - name: Print current directory
         run: pwd
 
-      - name: Debug repository structure (root)
+      - name: Debug repository structure
         run: ls -R
-
-      - name: Debug repository structure (src/decryptor)
-        run: ls -R src/decryptor || echo "Directory src/decryptor does not exist"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -32,35 +29,27 @@ jobs:
         run: pip install pytest pyinstaller black flake8
 
       - name: Code style check (Black)
-        run: black --check src/decryptor || echo "Directory src/decryptor does not exist or no files to check"
+        run: black --check src/decryptor/
 
       - name: Lint with flake8
-        run: flake8 src/decryptor/ || echo "Directory src/decryptor does not exist or no files to lint"
+        run: flake8 src/decryptor/
 
       - name: Run tests
-        run: pytest -v src/decryptor/tests/ || echo "No tests found in src/decryptor/tests/"
+        run: pytest -v src/decryptor/tests/
 
-      - name: Build executable
-        run: |
-          pyinstaller --onefile src/decryptor/main.py
-          mkdir -p dist
-          mv dist/main dist/decryptor
-
-      - name: Debug dist directory
-        run: ls -la dist
+      - name: Build artifact
+        run: pyinstaller --onefile src/decryptor/main.py --dist ./artifact
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: decryptor
-          path: dist/decryptor
+          path: ./artifact
 
   deploy:
     needs: build-and-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout code
@@ -73,14 +62,10 @@ jobs:
         with:
           name: decryptor
 
-      - name: Debug downloaded artifact
-        run: ls -la decryptor
-
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: decryptor/decryptor
-          tag_name: v$(date +%Y.%m.%d)
-          body: "Автоматический релиз"
+          files: artifact/main
+          tag_name: v1.0.0
