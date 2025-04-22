@@ -29,8 +29,7 @@ jobs:
         run: pip install pytest pyinstaller black flake8
 
       - name: Code style check (Black)
-        run: black --check src/decryptor/
-
+        run: black --check decryptor/
       - name: Lint with flake8
         run: flake8 src/decryptor/
 
