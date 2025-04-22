@@ -13,6 +13,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          
+      - name: Move into src folder
+        working-directory: ./src
+        run: echo "Now inside src/"
 
       - name: Print current directory
         run: pwd
@@ -29,7 +33,10 @@ jobs:
         run: pip install pytest pyinstaller black flake8
 
       - name: Code style check (Black)
-        run: black --check src/decryptor/
+        working-directory: ./src
+        run: black --check decryptor/
+
+      
 
       - name: Lint with flake8
         run: flake8 src/decryptor/
